@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"compress/gzip"
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"path"
 	"strconv"
 	"strings"
@@ -48,7 +49,7 @@ func locateClosestHeader(packageHeaderDir string, ver Version) (*Version, string
 	closestVersionPath := ""
 
 	for _, file := range files {
-		version, err := getKernelVersionFromArchiveFilePath(file)
+		version, err := getKernelVersionFromArchiveFilePath(file) // 从文件名中解析出版本号
 		if err != nil {
 			continue
 		}
@@ -58,7 +59,7 @@ func locateClosestHeader(packageHeaderDir string, ver Version) (*Version, string
 			closestVersionPath = file
 			continue
 		}
-
+		// 选择大于当前版本的版本
 		if distance(ver, version) < distance(ver, *closestVersion) {
 			closestVersion = &version
 			closestVersionPath = file
@@ -69,7 +70,7 @@ func locateClosestHeader(packageHeaderDir string, ver Version) (*Version, string
 		return nil, "", fmt.Errorf("could not find any kernel header tar file under %s", packageHeaderDir)
 	}
 
-	closestVersionFullPath := path.Join(packageHeaderDir, closestVersionPath)
+	closestVersionFullPath := path.Join(packageHeaderDir, closestVersionPath) // /starship/linux_header/linux-header-<version>.tar.gz
 	return closestVersion, closestVersionFullPath, nil
 }
 
@@ -143,13 +144,16 @@ func findKernelConfig(hostRootDir string, version Version, unameStr string) (str
 
 // genAutoConf generate auto conf base on kernel config
 // kernel config:
-//  CONFIG_CC_VERSION_TEXT="gcc (GCC) 12.2.0"
-//  CONFIG_CC_IS_GCC=y
-//  CONFIG_GCC_VERSION=120200
+//
+//	CONFIG_CC_VERSION_TEXT="gcc (GCC) 12.2.0"
+//	CONFIG_CC_IS_GCC=y
+//	CONFIG_GCC_VERSION=120200
+//
 // autoconf.h
-//  #define CONFIG_CC_VERSION_TEXT "gcc (GCC) 12.2.0"
-//  #define CONFIG_CC_IS_GCC 1
-//  #define CONFIG_GCC_VERSION 120200
+//
+//	#define CONFIG_CC_VERSION_TEXT "gcc (GCC) 12.2.0"
+//	#define CONFIG_CC_IS_GCC 1
+//	#define CONFIG_GCC_VERSION 120200
 func genAutoConf(packageHeaderDir, configFilePath string) (int, error) {
 	if !file.Exists(packageHeaderDir) {
 		return 0, fmt.Errorf("empty package header dir %s", packageHeaderDir)
@@ -232,30 +236,32 @@ func applyConfigPatches(hostRootDir, packageHeaderDir, starShipDir, unameStr str
 }
 
 // locateAndInstallPackagedHeaders that will find the Linux Kernel headers in the following order:
-// 1. search closest version from packaged header directory
-// 2. extract it to "/usr/src/linux-headers-<version>-starship" directory
-// 3. modify kernel version in "/usr/src/linux-headers-<version>-starship/include/generated/uapi/linux/version.h"
-// 4. apply config patches in "/usr/src/linux-headers-<version>-starship/include/generated/autoconf.h"
-//    and "/usr/src/linux-headers-<version>-starship/include/generated/timeconst.h"
-// 5. create a symlink from "/usr/src/linux-headers-<version>-starship" to "/usr/src/linux-headers-<version>/build"
+//  1. search closest version from packaged header directory
+//  2. extract it to "/usr/src/linux-headers-<version>-starship" directory
+//  3. modify kernel version in "/usr/src/linux-headers-<version>-starship/include/generated/uapi/linux/version.h"
+//  4. apply config patches in "/usr/src/linux-headers-<version>-starship/include/generated/autoconf.h"
+//     and "/usr/src/linux-headers-<version>-starship/include/generated/timeconst.h"
+//  5. create a symlink from "/usr/src/linux-headers-<version>-starship" to "/usr/src/linux-headers-<version>/build"
 func locateAndInstallPackageHeaders(hostRootDir, libModuleDir, starShipDir,
 	installHeadersDir, unameStr string, version Version,
 ) error {
-	libModuleBuildDir := path.Join(libModuleDir, "build")
+	libModuleBuildDir := path.Join(libModuleDir, "build") // "/lib/modules/<version>/build"
 
 	chosenVersion, chosenVersionPath, err := locateClosestHeader(starShipDir, version)
 	if err != nil {
 		return fmt.Errorf("while installing linux header, failed to locate the closest headers archive, error: %v", err)
 	}
-
+	// cgosenVersionPath: "/starship/linux_headers/linux-headers-4.14.304-starship.tar.gz"
+	// installHeaderSubDir: "usr/src/linux-headers-4.14.304-starship"
+	// installHeaderDir "/usr/src/linux-headers-4.14.304-starship"
 	installHeaderSubDir := fmt.Sprintf("usr/src/linux-headers-%s-starship", chosenVersion.semVerStr())
 	installHeaderDir := path.Join(installHeadersDir, installHeaderSubDir)
-
-	err = installPackagedHeader(chosenVersionPath, installHeadersDir)
+	log.Infof("installing linux header %s to %s", chosenVersionPath, installHeaderDir)
+	err = installPackagedHeader(chosenVersionPath, installHeadersDir) // extract to "/usr/src/linux-headers-<version>-starship"
 	if err != nil {
 		return fmt.Errorf("while installing linux header, failed to install oackaged headers, error: %v", err)
 	}
-
+	log.Infof("installed linux header %s to %s", chosenVersionPath, installHeaderDir)
 	err = modifyKernelVersion(installHeaderDir, version)
 	if err != nil {
 		return fmt.Errorf("while installing linux header, failed to modify kernel version, error: %v", err)

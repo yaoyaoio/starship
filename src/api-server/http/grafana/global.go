@@ -1,9 +1,10 @@
 package grafana
 
 // TODO(zhihui): Consider put these into a new type
-// type Client struct {
-//     ... base url, createAuthKey URI etc.
-// }
+//
+//	type Client struct {
+//	    ... base url, createAuthKey URI etc.
+//	}
 var (
 	BaseURL            string
 	CreateAuthKeysURI  string

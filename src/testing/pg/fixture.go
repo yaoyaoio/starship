@@ -27,9 +27,10 @@ func init() {
 // You can then destroy the fixtures by deferring statement:
 // cleaner, pgClient, err := createPGTestFixutre()
 // require.Nil(err)
-// defer func() {
-//   assert.Nil(cleaner())
-// }()
+//
+//	defer func() {
+//	  assert.Nil(cleaner())
+//	}()
 func LaunchContainer() (func() error, *pgutils.Client, error) {
 	pgRunner := &docker.Runner{
 		ImageName: postgresImageName,

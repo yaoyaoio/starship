@@ -94,10 +94,10 @@ func (c *Collector) StartProcInfoReport() error {
 // Inject outer-scope hostname into container, so the agent can use this to filter out updates not relevant to this node
 // from the K8s API server.
 // env:
-// - name: NODE_NAME
-//   valueFrom:
-//	   fieldRef:
-//	     fieldPath: spec.nodeName
+//   - name: NODE_NAME
+//     valueFrom:
+//     fieldRef:
+//     fieldPath: spec.nodeName
 func GetNodeName() string {
 	return os.Getenv("NODE_NAME")
 }
